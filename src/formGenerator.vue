@@ -77,7 +77,7 @@ div.vue-form-generator(v-if='schema != null')
 						validateAsync: false,
 						validateAfterChanged: false,
 						validationErrorClass: "error",
-						validationSuccessClass: ""
+						validationSuccessClass: "success"
 					};
 				}
 			},
@@ -103,6 +103,7 @@ div.vue-form-generator(v-if='schema != null')
 
 		data () {
 			return {
+				touched: [],
 				errors: [] // Validation errors
 			};
 		},
@@ -167,22 +168,25 @@ div.vue-form-generator(v-if='schema != null')
 			// Get style classes of field
 			getFieldRowClasses(field) {
 				const hasErrors = this.fieldErrors(field).length > 0;
+				const wasTouched = this.fieldTouched(field).length > 0;
 				let baseClasses = {
-					error: hasErrors,
+					error: hasErrors && wasTouched,
+					success: !hasErrors && wasTouched,
 					disabled: this.fieldDisabled(field),
 					readonly: this.fieldReadonly(field),
 					featured: this.fieldFeatured(field),
 					required: this.fieldRequired(field)
 				};
-
 				let {validationErrorClass, validationSuccessClass} = this.options;
-				if (validationErrorClass && validationSuccessClass) {
+				console.warn(validationErrorClass)
+				if (validationErrorClass && validationSuccessClass && wasTouched) {
 					if (hasErrors) {
 						baseClasses[validationErrorClass] = true;
 						baseClasses.error = false;
 					}
 					else {
 						baseClasses[validationSuccessClass] = true;
+						baseClasses.success = false;
 					}
 				}
 
@@ -297,6 +301,12 @@ div.vue-form-generator(v-if='schema != null')
 			onFieldValidated(res, errors, field) {
 				// Remove old errors for this field
 				this.errors = this.errors.filter(e => e.field != field.schema);
+				this.touched = this.touched.filter(e => e.field != field.schema);
+
+				this.touched.push({
+					field: field.schema,
+					touched: true
+				});
 
 				if (!res && errors && errors.length > 0) {
 					// Add errors with this field
@@ -318,9 +328,12 @@ div.vue-form-generator(v-if='schema != null')
 					isAsync = objGet(this.options, "validateAsync", false);
 				}
 				this.clearValidationErrors();
+				this.touched.splice(0);
 
 				let fields = [];
 				let results = [];
+
+				console.warn('validate went off')
 
 				forEach(this.$children, (child) => {
 					if (isFunction(child.validate)) {
@@ -374,6 +387,11 @@ div.vue-form-generator(v-if='schema != null')
 			fieldErrors(field) {
 				let res = this.errors.filter(e => e.field == field);
 				return res.map(item => item.error);
+			},
+
+			fieldTouched(field) {
+				let res = this.touched.filter(e => e.field == field);
+				return res.map(item => item.touched);
 			},
 
 			getFieldID(schema) {
